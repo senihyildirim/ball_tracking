@@ -2,25 +2,34 @@ import cv2
 import time
 from ultralytics import YOLO
 
-class Ball:
-    def __init__(self):
-        self.type = None
-        self.display_name = None
-        self.prev_avg_y = None
-        self.bouncing = False  # To track if the ball is bouncing
-        self.bounces = 0
-        self.coordinates = []
-        self.timestamps = []
 
+# Define a class to represent a ball
+class Ball:
+    def __init__(self, ball_type, display_name):
+        self.type = ball_type  # Type of the ball (e.g., "tennis", "soccer")
+        self.display_name = display_name  # A unique name for the ball
+        self.prev_avg_y = None  # Previous average Y-coordinate of the ball
+        self.bouncing = False  # Flag indicating whether the ball is bouncing
+        self.bounces = 0  # Number of bounces detected for the ball
+        self.coordinates = []  # List to store ball coordinates
+        self.timestamps = []  # List to store timestamps
+
+
+# Initialize the YOLO object detection model
 def initialize_yolo_model():
     return YOLO('best.pt')
 
+
+# Initialize the camera capture object
 def initialize_camera():
-    cap = cv2.VideoCapture(0)
-    cap.set(3, 800)
-    cap.set(4, 400)
+    # cap = cv2.VideoCapture("multiple_balls.mp4") #for multiple balls
+    cap = cv2.VideoCapture("basketball.mp4")  # for single ball
+    cap.set(3, 800)  # Set video width
+    cap.set(4, 400)  # Set video height
     return cap
 
+
+# Detect balls in a frame and track them
 def detect_balls(frame, model, balls):
     results = model.track(frame, persist=True)
 
@@ -32,11 +41,9 @@ def detect_balls(frame, model, balls):
                 break
 
         if ball_type is not None:
-            new_ball = Ball()
-            new_ball.type = ball_type
-            new_ball.display_name = f'ball_{len(balls) + 1}'  # Assign dynamic display name
+            # Create a new Ball object when a new ball is detected
+            new_ball = Ball(ball_type, f'ball_{len(balls) + 1}')
             balls.append(new_ball)
-            print(f"Detected a new ball: {new_ball.display_name}")
 
         for ball in balls:
             if ball.type in result.names.values():
@@ -50,64 +57,68 @@ def detect_balls(frame, model, balls):
                         center_x = int((x1 + x2) / 2)
                         center_y = int((y1 + y2) / 2)
 
+                        # Update ball coordinates and timestamps
                         ball.coordinates.append((center_x, center_y))
                         ball.timestamps.append(time.time())
 
-                        # Draw a circle around the detected ball
-                        cv2.circle(frame, (center_x, center_y), 20, (0, 0, 255), -1)  # You can adjust the circle size and color
-
-                        # Display the custom name on the ball
+                        # Draw a circle and label for the ball on the frame
+                        cv2.circle(frame, (center_x, center_y), 20, (0, 0, 255), -1)
                         cv2.putText(frame, f'{ball.display_name}',
                                     (center_x - 15, center_y + 25),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
 
+
+# Calculate bounces for each ball
 def calculate_bounces(frame, balls):
     for ball in balls:
         coordinates = ball.coordinates
         timestamps = ball.timestamps
-        if len(coordinates) >= 2:
-            y1, y2 = coordinates[-2][1], coordinates[-1][1]
-            t1, t2 = timestamps[-2], timestamps[-1]
+        if len(coordinates) >= 3:
+            y1, y2, y3 = coordinates[-3:]
 
-            if y2 > y1:  # Ball is ascending
-                ball.bouncing = False
-            elif y2 < y1 and not ball.bouncing:  # Ball is descending and not already bouncing
+            descending = y1[1] > y2[1] and y2[1] > y3[1]
+            ascending = y1[1] < y2[1] and y2[1] < y3[1]
+
+            if descending and ball.bouncing == False:
                 ball.bouncing = True
-            elif y2 < y1 and ball.bouncing:  # Ball is descending after bouncing
                 ball.bounces += 1
+            elif ascending and ball.bouncing == True:
                 ball.bouncing = False
-                print(f"Bounce Detected for {ball.display_name}!")
 
+            # Display the number of bounces for the ball on the frame
             cv2.putText(frame, f"Bounces {ball.display_name}: {ball.bounces}",
                         (20, 20 + balls.index(ball) * 40),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
 
-def main():
-    model = initialize_yolo_model()
-    cap = initialize_camera()
-    balls = []
 
-    capture_interval = 1.0 / 30.0  # Capture a frame every 1/30th of a second
+# Main function
+def main():
+    model = initialize_yolo_model()  # Initialize YOLO model
+    cap = initialize_camera()  # Initialize camera capture
+    balls = []  # List to store detected balls
+
     start_time = time.time()
 
     while True:
-        ret, frame = cap.read()
+        ret, frame = cap.read()  # Read a frame from the camera
 
-        detect_balls(frame, model, balls)
+
+        detect_balls(frame, model, balls)  # Detect and track balls in the frame
 
         elapsed_time = time.time() - start_time
 
         if elapsed_time >= 1.0:
-            calculate_bounces(frame, balls)
+            calculate_bounces(frame, balls)  # Calculate bounces
             start_time = time.time()
 
-        cv2.imshow('frame', frame)
+        cv2.imshow('frame', frame)  # Display the frame
 
-        if cv2.waitKey(25) & 0xFF == ord('q'):
+        if cv2.waitKey(25) & 0xFF == ord('q'):  # Press 'q' to exit
             break
 
-    cap.release()
-    cv2.destroyAllWindows()
+    cap.release()  # Release the camera
+    cv2.destroyAllWindows()  # Close the OpenCV window
+
 
 if __name__ == "__main__":
     main()
