@@ -2,7 +2,6 @@ import cv2
 import time
 from ultralytics import YOLO
 
-
 class Ball:
     def __init__(self, ball_type):
         self.type = ball_type
@@ -12,17 +11,14 @@ class Ball:
         self.coordinates = []
         self.timestamps = []
 
-
 def initialize_yolo_model():
     return YOLO('best.pt')
 
-
 def initialize_camera():
-    cap = cv2.VideoCapture("video.mov")
-    cap.set(3, 1920)
-    cap.set(4, 1080)
+    cap = cv2.VideoCapture("video.MOV")
+    cap.set(3, 800)
+    cap.set(4, 400)
     return cap
-
 
 def detect_balls(frame, model, balls):
     results = model.track(frame, persist=True)
@@ -43,50 +39,34 @@ def detect_balls(frame, model, balls):
                         ball.coordinates.append((center_x, center_y))
                         ball.timestamps.append(time.time())
 
+                        # Draw a circle around the detected ball
+                        cv2.circle(frame, (center_x, center_y), 10, (0, 0, 255), -1)  # You can adjust the circle size and color
+
                         cv2.putText(frame, f'{ball.type.capitalize()} ({center_x}, {center_y})',
                                     (center_x + 10, center_y - 10),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-
-                        # Draw a circle around the detected ball
-                        cv2.circle(frame, (center_x, center_y), 20, (0, 255, 0), 2)
 
 
 def calculate_bounces(frame, balls):
     for ball in balls:
         coordinates = ball.coordinates
-        if coordinates:
-            avg_x = sum(coord[0] for coord in coordinates) / len(coordinates)
-            avg_y = sum(coord[1] for coord in coordinates) / len(coordinates)
+        timestamps = ball.timestamps
+        if len(coordinates) >= 2:
+            y1, y2 = coordinates[-2][1], coordinates[-1][1]
+            t1, t2 = timestamps[-2], timestamps[-1]
 
-            if len(coordinates) >= 30:  # At least 30 frames for 1 second of movement at 30 FPS
-                recent_positions = coordinates[-30:]  # Get the last 30 positions
+            velocity = (y2 - y1) / (t2 - t1)  # Calculate vertical velocity
 
-                # Check for a valid bounce (descending followed by ascending)
-                descending = False
-                ascending = False
-                bounce_detected = False
-
-                for i in range(1, len(recent_positions)):
-                    y1, y2 = recent_positions[i - 1][1], recent_positions[i][1]
-
-                    if y1 > y2:  # Descending
-                        descending = True
-                    elif y1 < y2 and descending:  # Ascending after descending
-                        ascending = True
-                        if ascending and descending:
-                            bounce_detected = True
-
-                    if bounce_detected:
-                        ball.bounces += 1
-                        print(f"Bounce Detected for {ball.type.capitalize()}!")
-                        bounce_detected = False  # Reset the bounce detection
-
-            ball.prev_avg_y = avg_y
+            if velocity < 0:  # Descending
+                ball.bouncing = True
+            elif velocity >= 0 and ball.bouncing:  # Ascending after descending
+                ball.bounces += 1
+                ball.bouncing = False
+                print(f"Bounce Detected for {ball.type.capitalize()}!")
 
             cv2.putText(frame, f"Bounces {ball.type.capitalize()}: {ball.bounces}",
                         (20, 20 + balls.index(ball) * 40),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-
 
 def main():
     model = initialize_yolo_model()
@@ -114,7 +94,6 @@ def main():
 
     cap.release()
     cv2.destroyAllWindows()
-
 
 if __name__ == "__main__":
     main()
