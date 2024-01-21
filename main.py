@@ -18,9 +18,9 @@ def initialize_yolo_model():
 
 
 def initialize_camera():
-    cap = cv2.VideoCapture(0)
-    cap.set(3, 800)
-    cap.set(4, 400)
+    cap = cv2.VideoCapture("video.mov")
+    cap.set(3, 1920)
+    cap.set(4, 1080)
     return cap
 
 
@@ -46,6 +46,9 @@ def detect_balls(frame, model, balls):
                         cv2.putText(frame, f'{ball.type.capitalize()} ({center_x}, {center_y})',
                                     (center_x + 10, center_y - 10),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+
+                        # Draw a circle around the detected ball
+                        cv2.circle(frame, (center_x, center_y), 20, (0, 255, 0), 2)
 
 
 def calculate_bounces(frame, balls):
@@ -83,11 +86,6 @@ def calculate_bounces(frame, balls):
             cv2.putText(frame, f"Bounces {ball.type.capitalize()}: {ball.bounces}",
                         (20, 20 + balls.index(ball) * 40),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-
-            cv2.circle(frame, (int(avg_x), int(avg_y)), 5, (0, 255, 0), -1)
-
-            ball.coordinates = []
-            ball.timestamps = []
 
 
 def main():
