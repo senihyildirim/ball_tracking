@@ -55,11 +55,11 @@ def calculate_bounces(frame, balls):
             y1, y2 = coordinates[-2][1], coordinates[-1][1]
             t1, t2 = timestamps[-2], timestamps[-1]
 
-            velocity = (y2 - y1) / (t2 - t1)  # Calculate vertical velocity
-
-            if velocity < 0:  # Descending
+            if y2 > y1:  # Ball is ascending
+                ball.bouncing = False
+            elif y2 < y1 and not ball.bouncing:  # Ball is descending and not already bouncing
                 ball.bouncing = True
-            elif velocity >= 0 and ball.bouncing:  # Ascending after descending
+            elif y2 < y1 and ball.bouncing:  # Ball is descending after bouncing
                 ball.bounces += 1
                 ball.bouncing = False
                 print(f"Bounce Detected for {ball.type.capitalize()}!")
@@ -67,6 +67,7 @@ def calculate_bounces(frame, balls):
             cv2.putText(frame, f"Bounces {ball.type.capitalize()}: {ball.bounces}",
                         (20, 20 + balls.index(ball) * 40),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+
 
 def main():
     model = initialize_yolo_model()
